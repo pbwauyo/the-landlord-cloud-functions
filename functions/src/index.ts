@@ -1,7 +1,6 @@
-import * as functions from 'firebase-functions';
-import {computeDebts} from "./util-methods/create-debts"
+import * as functions from 'firebase-functions'
+import {computeDebts, calculateInitialOutstandingBalance} from "./util-methods/utils"
 import {Rental} from "./models/models"
-
 
 export const createDebts = functions.firestore.document("rentals/{rentalId}").onCreate((change, _) => 
     {
@@ -22,8 +21,19 @@ export const createDebts = functions.firestore.document("rentals/{rentalId}").on
 
         console.log("Created rental: ", rental)
 
-        return computeDebts(rental).catch((err) => {
-            console.error(err)
+        return computeDebts(rental)
+        .then((value) => {
+
+            console.log("RESULT: ", value)
+            const amount = Number(rental.amount)
+
+            calculateInitialOutstandingBalance(amount, rental.rentalId)
+            .catch((err) => {
+                console.error("Err in calc init bal: ", err)
+            })
+        })
+        .catch((err) => {
+            console.error("err in creating debts: ", err)
             return Promise.reject(`${err}`)
         })
     }

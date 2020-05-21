@@ -51,3 +51,21 @@ export const computeDebts = function (rental: Rental){
     return Promise.all(promises)
  
 }
+
+export const calculateInitialOutstandingBalance = async function (amount: number, rentalId: string){
+    const docReference = db.collection("rental_account_summary").doc(rentalId)
+    
+    let size = 0
+
+    try {
+        size = (await db.collection("debts").where("rentalId", "==", rentalId).get()).size
+    } catch (error) {
+        console.error("ERR in getting number of docs", error)
+    }
+    
+    const balance = amount * size
+
+    return docReference.set({
+        outstandingBalance : String(balance)
+    })
+}
