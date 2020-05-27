@@ -1,4 +1,5 @@
 export interface Debt{
+    debtId: string
     month: string
     year: string
     amount: string
@@ -12,4 +13,12 @@ export interface Rental{
     month: string
     year: string
     amount: string
+}
+
+export interface Payment{
+    month: string
+    year: string
+    dateOfPayment: string
+    rentalId: string
+    amountPaid: number
 }

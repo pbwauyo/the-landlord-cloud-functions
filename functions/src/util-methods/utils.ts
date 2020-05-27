@@ -1,9 +1,11 @@
 import * as admin from 'firebase-admin'
-import {Rental, Debt} from '../models/models'
+import {Rental, Debt, Payment} from '../models/models'
 
 admin.initializeApp()
 const db = admin.firestore()
 
+
+//create debts when rental is added
 export const computeDebts = function (rental: Rental){
     const currentTime = new Date()
     const startMonth = Number(rental.month)
@@ -12,6 +14,8 @@ export const computeDebts = function (rental: Rental){
     const endYear = currentTime.getFullYear()
 
     const promises = []
+
+    const debtsReference = db.collection("debts")
 
     loop1:
     for(let yr = startYear; yr <= endYear ; yr++){ // yr is years, mth is months
@@ -26,8 +30,10 @@ export const computeDebts = function (rental: Rental){
 
             const year = String(yr)
             const month = String(mth).padStart(2, "0")
+            const debtId = debtsReference.doc().id
 
             const debt: Debt = {
+                debtId: debtId,
                 year: year,
                 month: month,
                 amount: rental.amount,
@@ -36,8 +42,9 @@ export const computeDebts = function (rental: Rental){
             }
 
             
-            const addPromise = db.collection("debts")
-                                    .add(debt)
+            const addPromise = debtsReference
+                                 .doc(debtId)
+                                 .set(debt)
                         
             promises.push(addPromise)
 
@@ -66,6 +73,44 @@ export const calculateInitialOutstandingBalance = async function (amount: number
     const balance = amount * size
 
     return docReference.set({
-        outstandingBalance : String(balance)
+        outstandingBalance : String(balance),
+        rentalId: rentalId
     })
+}
+
+
+//update debt on payment
+export const handleDebt = function (payment: Payment){
+
+    return db.collection("debts")
+            .where("rentalId", "==", payment.rentalId)
+            .where("month", "==", payment.month)
+            .where("year", "==", payment.year)
+            .get()
+            .then((snapshot) => {
+                const doc = snapshot.docs[0]
+                const debt = doc.data()
+
+                const newBalance = Number(debt.amount) - payment.amountPaid
+
+                if(newBalance === 0){           // if no balance is remaining
+                    return doc.ref.delete()     //delete document
+                }else{
+                    return doc.ref.update({
+                        amount : newBalance     //update debt
+                    })
+                }
+            })
+     
+}
+
+export const updateLastPayment = function(rentalId: string, dateOfPayment: string){
+    return db.collection("rental_amount_summary").doc(rentalId).set(
+            {
+                dateOfLastPayment: dateOfPayment
+            }, 
+            {
+                merge: true
+            }
+        )
 }
